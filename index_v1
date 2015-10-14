@@ -1,0 +1,62 @@
+require(plyr)
+require(fArma)
+
+#### Get Data
+path_data = '~/Code/R/TrendRiskParity/data/'
+allfiles = list.files(path_data)
+
+output = data.frame()
+for(f in allfiles){
+
+	fut_names = strsplit(gsub(".csv","",f), "_")[[1]]
+	fut_names = fut_names[!gsub("1", "xxx", fut_names) == fut_names][1]
+	cat("Getting Data for ", fut_names, "\n", sep = "")
+
+	temp = read.csv(paste(path_data, f, sep = ""), stringsAsFactors = FALSE)
+	temp = subset(temp, !is.na(Settle))[,c("Date","Settle")]
+	names(temp)[2] = fut_names
+	temp$Date = as.Date(temp$Date)
+
+	if (dim(output)[1] == 0){
+		output = temp
+	} else {
+		output = merge(output, temp)
+	}
+
+}
+
+output_ret = cbind(data.frame(Date = output$Date[-1]), apply(output[,-1], 2, function(x){-1 + exp(diff(log(x)))}))
+
+#### Generate Schedule
+day_of_month = 15
+start_date = as.Date(paste(format(min(output$Date), "%Y-%m"), day_of_month, sep = "-"))
+end_date = as.Date(paste(format(max(output$Date), "%Y-%m"), day_of_month, sep = "-"))
+
+rolldates = seq(start_date, end_date, by = "1 month")
+schedule = data.frame(roll = 0:(length(rolldates) - 2), start = rolldates[-length(rolldates)], end = rolldates[-1])
+schedule = subset(schedule, end <= end_date)
+
+monthly_return = ddply(schedule, .(roll), function(X,Y){return(apply(subset(Y, Date >= X$start & Date <= X$end)[,-1],2,sum))}, output_ret)
+yearly_return = apply(monthly_return[,-1], 2, function(X,h){
+  X = cumsum(X)
+  N = length(X)
+  X[h:N] - c(0,X[1:(N-h)])}, 12)
+yearly_return = cbind(data.frame(roll = monthly_return$roll[12:dim(monthly_return)[1]]), yearly_return)
+
+undl = "SF1"
+plot(output$Date, output[[undl]], type = "l")
+
+ret_m = monthly_return[,c("roll", undl)]; names(ret_m)[2] = "monthly_ret"
+ret_m_prev = ret_m; ret_m_prev$roll = ret_m_prev$roll + 1; names(ret_m_prev)[2] = "prev_monthly_ret"
+ret_m = merge(ret_m, ret_m_prev)
+
+ret_y = yearly_return[,c("roll", undl)]; ret_y$roll = ret_y$roll + 1; names(ret_y)[2] = "yearly_ret"
+ret_m = merge(ret_m, ret_y)
+summary(lm(monthly_ret ~ prev_monthly_ret + yearly_ret, ret_m))
+
+
+pengFit(output_ret[[undl]], method = "mean")@hurst$diag[2,]
+
+#### returns & weighted returns
+#### autocorrel
+#### Hurst
