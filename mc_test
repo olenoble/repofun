@@ -1,0 +1,72 @@
+import os 
+import pandas as pd
+import numpy as np
+import scipy as sp
+from scipy.optimize import minimize
+from pandas.io.data import DataReader
+import datetime as dt
+import pylab as plt
+
+os.chdir('/home/zoe/Code/Python/rp_test')
+
+vol1 = 0.25
+vol2 = 0.25
+rho = 0.5
+
+step = 1.0 / 252
+
+l_ts = 252 * 10
+dw1 = np.random.normal(size = l_ts); dw1 = (dw1 - np.mean(dw1)) / np.std(dw1)
+dw2 = np.random.normal(size = l_ts); dw2 = (dw2 - np.mean(dw2)) / np.std(dw2)
+dw2 = dw1 * rho + dw2 * np.sqrt(1-rho*rho)
+
+
+s1 = 100 * np.exp((-vol1 * vol1 * 0.5 * step * np.array(range(len(dw1)))) + vol1 * np.sqrt(step)*(np.cumsum(dw1) - dw1[0]))
+s2 = 100 * np.exp((-vol2 * vol2 * 0.5 * step * np.array(range(len(dw2)))) + vol2 * np.sqrt(step)*(np.cumsum(dw2) - dw2[0]))
+
+s1 = pd.DataFrame(s1, columns = ['s1'])
+s2 = pd.DataFrame(s2, columns = ['s2'])
+data_all = pd.merge(s1, s2, left_index = True, right_index = True)
+
+
+
+def rp_fun(w):
+	return -1.0 * np.sum(np.log(w))
+
+roll_i = range(21, len(s1) - 21, 21)
+volt = 0.05
+
+idx_lvl = 100
+idxhist = pd.DataFrame()
+
+i = 5
+for i in range(5, len(roll_i)-1):
+	print i
+	rolltemp = roll_i[i]
+	s1_calib = data_all[data_all.index < rolltemp]
+	s1_calib = s1_calib[s1_calib.index >= rolltemp - 90]
+	covdata = s1_calib.apply(lambda x: np.log(x/x.shift()), 0).apply(lambda x: x - np.mean(x), 0)[1:]
+	covmat = np.dot(covdata.T,covdata)
+
+	ls_assign = np.sign(np.random.rand(2) - 0.5)
+	covmat = np.dot(np.diag(ls_assign), np.dot(covmat, np.diag(ls_assign)))
+
+	cons = {'type': 'ineq', 'fun': lambda x, c, v:  -np.dot(x, np.dot(c,x)) + v, 'args': (covmat, volt * volt * step,)}
+	res = minimize(rp_fun, (0.001, 0.001), bounds = [(0, 10000), (0,10000)], method='SLSQP', constraints=cons)
+	if not res['success']:
+		print res['messsage']
+		
+	wgt = res['x'] * ls_assign
+
+	s1_idx = data_all[data_all.index >= rolltemp]
+	s1_idx = s1_idx[s1_idx.index <= roll_i[i+1]]
+
+	index_ret = s1_idx.apply(lambda x: x / x[min(x.index)] - 1, 0) * wgt
+	index_new = idx_lvl * (1 + np.cumsum(index_ret.apply(sum, 1)))
+
+	idx_lvl = index_new.values[-1]
+	idxhist = idxhist.append(pd.DataFrame(index_new[:-1], columns = ['test']), ignore_index=True)
+
+
+np.std(idxhist.apply(lambda x: x / x.shift() - 1))*np.sqrt(1/step)
+
