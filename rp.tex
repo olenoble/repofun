@@ -1,0 +1,91 @@
+\documentclass[10pt]{article}
+
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+
+\begin{document}
+\section{Risk Parity - Solution to simple case}
+Assuming we have $N$ underlyings. Risk-Parity weights are calculated by finding the maximum of
+\begin{align}
+\sum_i\ln(w_i)
+\end{align}
+subjected to the constraints
+\begin{align}
+\bullet\ \ \  & w^T\Sigma w \leq \sigma^2_T\\\
+\bullet\ \ \ & w_i > 0, \forall i,
+\end{align}
+where $\Sigma$ is the covariance matrix, i.e. with entries $\Sigma_{ij} = \sigma_i\sigma_j\rho_{ij}$ ($\sigma_i$ denotes the volatility of underlying $i$ and $\rho_{ij}$ the pairwise correlation between underlyings $i$ and $j$). The parameter $\sigma_T$ corresponds to the target volatility. Note that long/short position are accounted for by adjusting the sign of correlation in the covariance matrix.\\ \\
+To solve the above optimisation problem, we need to find the weights $\{w_i\}$ such that, for all $k$,
+\begin{align}
+\partial_{w_k}F(w) = 0 &= \partial_{w_k}\left(\sum_i\ln(w_i) - \lambda\left(\sum_{ij}w_iw_j\sigma_i\sigma_j\rho_{ij}\right)\right), \\
+0 &=\frac{1}{w_k}  - 2\lambda\left(\sum_{j}w_j\sigma_k\sigma_j\rho_{kj}\right)\label{eq_ref}
+\end{align}
+Multiplying across by $w_k$ and summing over $k$ in the equation above, we get the solution for the Lagrange multiplier $lambda$
+\begin{align}
+0 &=\left(\sum_k 1\right)  - 2\lambda\left(\sum_{jk}w_jw_k\sigma_k\sigma_j\rho_{kj}\right)\\
+0 &= N - 2\lambda\sigma^2_T,
+\end{align}
+that is $\lambda = \frac{N}{2\sigma^2_T}$. Plugging this back into equation (\ref{eq_ref}), we have
+
+\begin{align}
+0 &= 1 - \frac{N}{\sigma^2_T}w_k\left(\sum_{j}w_j\sigma_k\sigma_j\rho_{kj}\right).
+\end{align}
+We define here $w_i = \frac{1}{\sqrt{N}}\frac{\sigma_T}{\sigma_i}\alpha_i, \forall i$, which leads to
+\begin{align}
+0 &= 1 - \alpha_k\left(\sum_{j}\alpha_j\rho_{kj}\right) = 1 - \alpha_k\left(\alpha_k + \sum_{j\neq k}\rho_{kj}\alpha_j\right).
+\end{align}
+Assume for simplicity that $\rho_{kj} = 1 + \left(\rho - 1\right)\delta_{kj}$ (i.e. all pairwise correlations are identical). In this case, all terms $\alpha_i$ should be identical (as they follow all the same equations), and therefore
+\begin{align}
+0 &= 1 - \alpha\left(\alpha + (N-1)\rho\alpha\right)\rightarrow \alpha = \frac{1}{\sqrt{1+(N-1)\rho}}.
+\end{align}
+And therefore
+\begin{align}
+w_k = \frac{\sigma_T}{\sigma_k}\frac{l_k}{\sqrt{N(1+(N-1)\rho)}}, \label{wgt_simple}
+\end{align}
+where $l_k=\pm 1$ indicates whether the position is long or short. Note that the above solution is exact for $N = 2$.
+
+\section{Index volatility}
+The volatility of the risk-parity index can be estimated as follows (we will assume for the sake of simplicity that we rebalance daily here). In the equation below, $r_{i,t}$ denotes the return of underlying $i$ at time $t$. Using (\ref{wgt_simple}),
+\begin{align}
+\sigma^2_{index} &= \mathbb{E}\left\{\sum_{i,j} w_iw_jr_{i,t}r_{j,t}\right\}\\
+&= \frac{\sigma^2_T}{N(1+(N-1)\rho)}\left\{\sum_{i}\frac{\tilde{\sigma}^2_i}{\sigma_i^2}+\rho\sum_{j\neq i}\frac{\tilde{\sigma}_i\tilde{\sigma}_j}{\sigma_i\sigma_j}\right\},\label{index_vol}
+\end{align}
+where $\tilde{\sigma}$ represents the post-calibration volatility. It is important to understand that the post-calibration volatility may different for pre-calibration volatility, i.e. $\sigma_i \neq \tilde{\sigma_i}$ unless there is no volatility of volatility.
+
+\subsection{Vol of Vol = 0}
+In this case, we get $\sigma_i = \tilde{\sigma_i}$ and the index volatility simply becomes
+\begin{align}
+\sigma^2_{index} &= \frac{\sigma^2_T}{N(1+(N-1)\rho)}\left\{N+N(N -1)\rho\right\},\\
+ &= \sigma^2_T.
+\end{align}
+
+\subsection{Vol of Vol $>$ 0}
+We denote the vol of vol for each underlying $k$ as $\nu_k$ and 
+\begin{align}
+\bullet\ \ \ & \sigma_k = \overline{\sigma}_k\exp\left(-\frac{\nu_k^2}{2} + \nu_k\epsilon_k\right) \\
+\bullet\ \ \ & \tilde{\sigma}_k = \overline{\sigma}_k\exp\left(-\frac{\nu_k^2}{2} + \nu_k\tilde{\epsilon}_k\right).
+\end{align}
+With $\overline{\sigma}$ denoting the average volatility. For simplicity, we will assume that\footnote{This doesn't affect the conclusion of this section. If Brownians $\epsilon$ and $\tilde{\epsilon}$ are correlation, this only implies an adjustement to the vol of vol.} $\forall i\neq j$,
+\begin{align}
+\mathbb{E}\left\{\epsilon_i\epsilon_j\right\} =\mathbb{E}\left\{\tilde{\epsilon_i}\epsilon_j\right\}=\mathbb{E}\left\{\tilde{\epsilon_i}\tilde{\epsilon_j}\right\} = 0
+\end{align}
+Using the above, the average volatility in (\ref{index_vol}) becomes
+\begin{align}
+\sigma^2_{index} &= \frac{\sigma^2_T}{N(1+(N-1)\rho)}\left\{\sum_{i}\exp\left(4\nu_i^2\right)+\rho\sum_{j\neq i}\exp\left((\nu_i^2+\nu_j^2)\right)\right\}.
+\end{align}
+\ \\
+In order to estimate the impact on the index volatility, we assume for simplicity $\nu_i = \nu$, $\forall i$. This gives us
+\begin{align}
+\sigma^2_{index} &= \frac{\sigma^2_T}{N(1+(N-1)\rho)}\left\{N\exp\left(4\nu^2\right)+\rho N(N-1)\exp\left(2\nu^2\right)\right\}\\
+&= \frac{\sigma^2_T\exp\left(4\nu^2\right)}{(1+(N-1)\rho)}\left\{1+\rho (N-1)\exp\left(-2\nu^2\right)\right\}
+\end{align}
+\ \\ \\
+We can identify two special cases:
+\begin{itemize}
+\item No correlation, i.e. $\rho = $, in which case $\sigma_{index} = \sigma_T\exp\left(2\nu^2\right)$,
+\item High correlation, i.e. $(N-1)\rho \gg 1$, in which case $\sigma_{index} = \sigma_T\exp\left(\nu^2\right)$.
+\end{itemize}
+
+
+\end{document}
